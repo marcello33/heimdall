@@ -3,11 +3,19 @@ package processor
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
+	"math/rand"
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/RichardKnop/machinery/v1"
 	"github.com/RichardKnop/machinery/v1/config"
 	"github.com/golang/mock/gomock"
 	"github.com/maticnetwork/bor/common"
 	"github.com/maticnetwork/bor/core/types"
+	"github.com/spf13/viper"
+
 	"github.com/maticnetwork/heimdall/app"
 	authTypes "github.com/maticnetwork/heimdall/auth/types"
 	authTypesMocks "github.com/maticnetwork/heimdall/auth/types/mocks"
@@ -17,12 +25,6 @@ import (
 	"github.com/maticnetwork/heimdall/bridge/setu/util"
 	"github.com/maticnetwork/heimdall/helper"
 	helperMocks "github.com/maticnetwork/heimdall/helper/mocks"
-	"github.com/spf13/viper"
-	"io/ioutil"
-	"math/rand"
-	"net/http"
-	"testing"
-	"time"
 )
 
 const (
@@ -332,32 +334,34 @@ func BenchmarkSendStateSyncedToHeimdall(b *testing.B) {
 	b.StopTimer()
 
 	for i := 0; i < b.N; i++ {
-		b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
+		func() {
+			b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
 
-		// given
-		mockCtrl := prepareMockData(b)
+			// given
+			mockCtrl := prepareMockData(b)
+			defer mockCtrl.Finish()
 
-		cp, err := prepareClerkProcessor()
-		if err != nil {
-			b.Fatal("Error initializing test clerk processor")
-		}
-		dlb, err := prepareDummyLogBytes()
-		if err != nil {
-			b.Fatal("Error creating test data")
-		}
+			cp, err := prepareClerkProcessor()
+			if err != nil {
+				b.Fatal("Error initializing test clerk processor")
+			}
+			dlb, err := prepareDummyLogBytes()
+			if err != nil {
+				b.Fatal("Error creating test data")
+			}
 
-		// when
-		b.StartTimer()
-		err = cp.sendStateSyncedToHeimdall("StateSynced", dlb.String())
-		b.StopTimer()
+			// when
+			b.StartTimer()
+			err = cp.sendStateSyncedToHeimdall("StateSynced", dlb.String())
+			b.StopTimer()
 
-		// then
-		if err != nil {
-			b.Fatal(err)
-		}
+			// then
+			if err != nil {
+				b.Fatal(err)
+			}
 
-		b.Log("StateSynced sent to heimdall successfully")
-		mockCtrl.Finish()
+			b.Log("StateSynced sent to heimdall successfully")
+		}()
 	}
 }
 
@@ -367,31 +371,32 @@ func BenchmarkIsOldTx(b *testing.B) {
 	b.StopTimer()
 
 	for i := 0; i < b.N; i++ {
+		func() {
+			b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
 
-		b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
+			// given
+			mockCtrl := prepareMockData(b)
+			mockCtrl.Finish()
 
-		// given
-		mockCtrl := prepareMockData(b)
+			cp, err := prepareClerkProcessor()
+			if err != nil {
+				b.Fatal("Error initializing test clerk processor")
+			}
 
-		cp, err := prepareClerkProcessor()
-		if err != nil {
-			b.Fatal("Error initializing test clerk processor")
-		}
+			// when
+			b.StartTimer()
+			status, err := cp.isOldTx(
+				cp.cliCtx, "0x6d428739815d7c84cf89db055158861b089e0fd649676a0243a2a2d204c1d854",
+				0, util.ClerkEvent, nil)
+			b.StopTimer()
 
-		// when
-		b.StartTimer()
-		status, err := cp.isOldTx(
-			cp.cliCtx, "0x6d428739815d7c84cf89db055158861b089e0fd649676a0243a2a2d204c1d854",
-			0, util.ClerkEvent, nil)
-		b.StopTimer()
+			// then
+			if err != nil {
+				b.Fatal(err)
+			}
 
-		// then
-		if err != nil {
-			b.Fatal(err)
-		}
-
-		b.Logf("isTxOld tested successfully with result: '%t'", status)
-		mockCtrl.Finish()
+			b.Logf("isTxOld tested successfully with result: '%t'", status)
+		}()
 	}
 }
 
@@ -406,33 +411,36 @@ func BenchmarkSendTaskWithDelay(b *testing.B) {
 	b.StopTimer()
 
 	for i := 0; i < b.N; i++ {
-		b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
+		func() {
+			b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
 
-		// given
-		mockCtrl := prepareMockData(b)
+			// given
+			mockCtrl := prepareMockData(b)
+			defer mockCtrl.Finish()
 
-		logs, err := prepareDummyLogBytes()
-		if err != nil {
-			b.Fatal("Error creating test data")
-		}
+			logs, err := prepareDummyLogBytes()
+			if err != nil {
+				b.Fatal("Error creating test data")
+			}
 
-		rcl, err := prepareRootChainListener()
-		if err != nil {
-			b.Fatal("Error initializing test listener")
-		}
+			rcl, stopFn, err := prepareRootChainListener()
+			defer stopFn()
+			if err != nil {
+				b.Fatal("Error initializing test listener")
+			}
 
-		// when
-		b.StartTimer()
-		// This will trigger 'error="Set state pending error: dial tcp 127.0.0.1:6379: connect: connection refused'
-		// it's fine as long as we don't want to test the actual sendTask to rabbitmq
-		rcl.SendTaskWithDelay(
-			"sendStateSyncedToHeimdall", "StateSynced",
-			logs.Bytes(), ts[i], nil)
-		b.StopTimer()
+			// when
+			b.StartTimer()
+			// This will trigger 'error="Set state pending error: dial tcp 127.0.0.1:6379: connect: connection refused'
+			// it's fine as long as we don't want to test the actual sendTask to rabbitmq
+			rcl.SendTaskWithDelay(
+				"sendStateSyncedToHeimdall", "StateSynced",
+				logs.Bytes(), ts[i], nil)
+			b.StopTimer()
 
-		// then
-		b.Logf("SendTaskWithDelay tested successfully")
-		mockCtrl.Finish()
+			// then
+			b.Logf("SendTaskWithDelay tested successfully")
+		}()
 	}
 }
 
@@ -443,29 +451,31 @@ func BenchmarkCalculateTaskDelay(b *testing.B) {
 	b.StopTimer()
 
 	for i := 0; i < b.N; i++ {
-		b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
+		func() {
+			b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
 
-		// given
-		mockCtrl := prepareMockData(b)
+			// given
+			mockCtrl := prepareMockData(b)
+			mockCtrl.Finish()
 
-		cp, err := prepareClerkProcessor()
-		if err != nil {
-			b.Fatal("Error initializing test clerk processor")
-		}
+			cp, err := prepareClerkProcessor()
+			if err != nil {
+				b.Fatal("Error initializing test clerk processor")
+			}
 
-		// when
-		b.StartTimer()
-		isCurrentValidator, timeDuration := util.CalculateTaskDelay(cp.cliCtx, nil)
-		b.StopTimer()
+			// when
+			b.StartTimer()
+			isCurrentValidator, timeDuration := util.CalculateTaskDelay(cp.cliCtx, nil)
+			b.StopTimer()
 
-		// then
-		if err != nil {
-			b.Fatal(err)
-		}
+			// then
+			if err != nil {
+				b.Fatal(err)
+			}
 
-		b.Logf("isTxOld tested successfully. Results: isCurrentValidator: '%t', timeDuration: '%s'",
-			isCurrentValidator, timeDuration.String())
-		mockCtrl.Finish()
+			b.Logf("isTxOld tested successfully. Results: isCurrentValidator: '%t', timeDuration: '%s'",
+				isCurrentValidator, timeDuration.String())
+		}()
 	}
 }
 
@@ -475,24 +485,27 @@ func BenchmarkGetUnconfirmedTxnCount(b *testing.B) {
 	b.StopTimer()
 
 	for i := 0; i < b.N; i++ {
-		b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
+		func() {
+			b.Logf("Executing iteration '%d' out of '%d'", i, b.N)
 
-		// given
-		mockCtrl := prepareMockData(b)
+			// given
+			mockCtrl := prepareMockData(b)
+			mockCtrl.Finish()
 
-		_, err := prepareRootChainListener()
-		if err != nil {
-			b.Fatal("Error initializing test listener")
-		}
+			_, stopFn, err := prepareRootChainListener()
+			defer stopFn()
+			if err != nil {
+				b.Fatal("Error initializing test listener")
+			}
 
-		// when
-		b.StartTimer()
-		util.GetUnconfirmedTxnCount(nil)
-		b.StopTimer()
+			// when
+			b.StartTimer()
+			util.GetUnconfirmedTxnCount(nil)
+			b.StopTimer()
 
-		// then
-		b.Logf("GetUnconfirmedTxnCount tested successfully")
-		mockCtrl.Finish()
+			// then
+			b.Logf("GetUnconfirmedTxnCount tested successfully")
+		}()
 	}
 }
 
@@ -544,7 +557,7 @@ func prepareClerkProcessor() (*ClerkProcessor, error) {
 	return cp, nil
 }
 
-func prepareRootChainListener() (*listener.RootChainListener, error) {
+func prepareRootChainListener() (*listener.RootChainListener, func(), error) {
 	cdc := app.MakeCodec()
 
 	viper.Set(helper.NodeFlag, dummyTenderMintNode)
@@ -555,18 +568,26 @@ func prepareRootChainListener() (*listener.RootChainListener, error) {
 	configuration.TendermintRPCUrl = dummyTenderMintNode
 	helper.SetTestConfig(configuration)
 
+	stopFn := func() {}
+
 	rcl := listener.NewRootChainListener()
 	rcl.Logger = helper.Logger
 
 	server, err := getTestServer()
 	if err != nil {
-		return nil, err
+		return nil, stopFn, err
 	}
 
 	rcl.BaseListener = *listener.NewBaseListener(
 		cdc, &queue.QueueConnector{Server: server}, nil, helper.GetMainClient(), "rootchain", rcl)
 
-	return rcl, nil
+	stopFn = func() {
+		rcl.Stop()
+		helper.GetMainClient().Close()
+		rcl.BaseListener.Stop()
+	}
+
+	return rcl, stopFn, nil
 }
 
 func prepareDummyLogBytes() (*bytes.Buffer, error) {
