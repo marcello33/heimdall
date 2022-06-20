@@ -14,6 +14,7 @@ import (
 	ethereum "github.com/maticnetwork/bor"
 	"github.com/maticnetwork/bor/core/types"
 	"github.com/maticnetwork/bor/ethclient"
+
 	"github.com/maticnetwork/heimdall/bridge/setu/queue"
 	"github.com/maticnetwork/heimdall/bridge/setu/util"
 	"github.com/maticnetwork/heimdall/helper"
@@ -203,12 +204,13 @@ func (bl *BaseListener) StartSubscription(ctx context.Context, subscription ethe
 
 // OnStop stops all necessary go routines
 func (bl *BaseListener) Stop() {
-
 	// cancel subscription if any
 	if bl.cancelSubscription != nil {
 		bl.cancelSubscription()
 	}
 
 	// cancel header process
-	bl.cancelHeaderProcess()
+	if bl.cancelHeaderProcess != nil {
+		bl.cancelHeaderProcess()
+	}
 }
