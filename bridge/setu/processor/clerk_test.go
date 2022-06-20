@@ -376,7 +376,7 @@ func BenchmarkIsOldTx(b *testing.B) {
 
 			// given
 			mockCtrl := prepareMockData(b)
-			mockCtrl.Finish()
+			defer mockCtrl.Finish()
 
 			cp, err := prepareClerkProcessor()
 			if err != nil {
@@ -456,7 +456,7 @@ func BenchmarkCalculateTaskDelay(b *testing.B) {
 
 			// given
 			mockCtrl := prepareMockData(b)
-			mockCtrl.Finish()
+			defer mockCtrl.Finish()
 
 			cp, err := prepareClerkProcessor()
 			if err != nil {
@@ -490,7 +490,7 @@ func BenchmarkGetUnconfirmedTxnCount(b *testing.B) {
 
 			// given
 			mockCtrl := prepareMockData(b)
-			mockCtrl.Finish()
+			defer mockCtrl.Finish()
 
 			_, stopFn, err := prepareRootChainListener()
 			defer stopFn()
