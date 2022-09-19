@@ -28,7 +28,7 @@ tests:
 build: clean
 	go run helper/heimdall-params.template.go $(network)
 	mkdir -p build
-	env GOOS=linux GOARCH=arm64 go build -o build/heimdalld ./cmd/heimdalld
+	env GOOS=linux GOARCH=amd64 go build -o build/heimdalld ./cmd/heimdalld
 	go build -o build/heimdallcli ./cmd/heimdallcli
 	@echo "====================================================\n==================Build Successful==================\n===================================================="
 	
