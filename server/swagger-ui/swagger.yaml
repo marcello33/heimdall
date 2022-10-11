@@ -778,6 +778,18 @@ definitions:
         x-go-name: Result
     type: object
     x-go-package: _/Users/vaibhavjindal/heimdall/gov/client/rest
+  govProposalsDepositsStructure: 
+    properties: 
+      proposal_id:
+        type: integer
+      depositor:
+        type: string
+      amount:
+        items:
+          $ref: '#/definitions/coin'
+        type: array
+      validator:
+        type: integer
   govParameterDeposit:
     properties:
       max_deposit_period:
@@ -915,6 +927,18 @@ definitions:
         $ref: '#/definitions/proposer'
     type: object
     x-go-package: _/Users/vaibhavjindal/heimdall/gov/client/rest
+  govSubmitProposalStructure:
+    properties: 
+      content:
+        $ref: '#/definitions/content'
+      initial_deposit:
+        items:
+          $ref: '#/definitions/coin'
+        type: array
+      proposer:
+        type: string
+      validator_id:
+        type: integer
   govVoteStructure:
     properties:
       height:
@@ -2781,7 +2805,7 @@ paths:
         x-go-name: Height
       responses:
         "200":
-          $ref: '#/responses/interface%7B%7D'
+          $ref: '#/responses/govSubmitProposalResponse'
       tags:
       - gov
   /gov/proposals/{proposal-id}:
@@ -2937,7 +2961,7 @@ paths:
         x-go-name: Input
       responses:
         "200":
-          $ref: '#/responses/interface%7B%7D'
+          $ref: '#/responses/govProposalVoteResponse'
       tags:
       - gov
   /gov/proposals/{proposal-id}/votes/{voter}:
@@ -3583,6 +3607,9 @@ paths:
         name: limit
         type: integer
         x-go-name: Limit
+      responses:
+        "200":
+          $ref: '' #TODO
       summary: It returns the list of transaction based on page,limit and events specified.
       tags:
       - txs
@@ -3597,6 +3624,9 @@ paths:
           $ref: '#/definitions/txsBroadcastInput'
         x-go-name: Input
       summary: It broadcast the signed transaction to the network.
+      responses:
+        "200":
+          $ref: '' #TODO!
       tags:
       - txs
   /txs/{hash}:
@@ -3618,6 +3648,9 @@ paths:
         name: height
         type: integer
         x-go-name: Height
+      responses:
+        "200": 
+          $ref: '' #TODO!
       summary: It returns the transaction by hash.
       tags:
       - txs
@@ -3637,6 +3670,9 @@ paths:
         name: height
         type: integer
         x-go-name: Height
+      responses:
+        "200":
+          $ref: '' #TODO
       summary: It returns the commit-proof for the transaction.
       tags:
       - txs
@@ -3657,6 +3693,9 @@ paths:
         name: height
         type: integer
         x-go-name: Height
+      responses:
+        "200":
+          $ref: '' #TODO
       tags:
       - txs
   /txs/encode:
@@ -3671,7 +3710,9 @@ paths:
         schema:
           $ref: '#/definitions/txsEncodeInput'
         x-go-name: Input
-      responses: {}
+      responses:
+        "200":
+          $ref: ''
       tags:
       - txs
 responses:
@@ -3775,6 +3816,10 @@ responses:
     description: It represents the vote response
     schema:
       $ref: '#/definitions/govDepositsStructure'
+  govProposalsDepositsResponse:
+    description: It returns the prepared msg for gov proposal deposit
+    schema:
+      $ref: '#/definitions/govProposalsDepositsStructure'
   govParametersDepositResponse:
     description: It represents the gov deposit parameters
     schema:
@@ -3799,6 +3844,10 @@ responses:
     description: It represents the gov proposer
     schema:
       $ref: '#/definitions/govProposerStructure'
+  govSubmitProposalResponse:
+    description: It represents submit proposal message
+    schema:
+      $ref: '#/definitions/govSubmitProposalStructure'
   govTallyResponse:
     description: It represents the gov Tally based on Id
     schema:
@@ -3811,6 +3860,10 @@ responses:
     description: It represents the votes responses
     schema:
       $ref: '#/definitions/govVotesStructure'
+  govProposalVoteResponse:
+    description: It represents the proposal vote response
+    schema:
+      $ref: '#/definitions/vote'
   lastNoAckResponse:
     description: It represents the last-no-ack
     schema:
