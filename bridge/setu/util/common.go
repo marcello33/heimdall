@@ -41,6 +41,7 @@ const (
 	ProposersURL            = "/staking/proposer/%v"
 	BufferedCheckpointURL   = "/checkpoints/buffer"
 	LatestCheckpointURL     = "/checkpoints/latest"
+	CheckpointByNumberURL   = "/checkpoints/%v"
 	CountCheckpointURL      = "/checkpoints/count"
 	CurrentProposerURL      = "/staking/current-proposer"
 	LatestSpanURL           = "/bor/latest-span"
@@ -383,7 +384,7 @@ func GetCheckpointParams(cliCtx cliContext.CLIContext) (*checkpointTypes.Params,
 	return &params, nil
 }
 
-// GetBufferedCheckpoint return checkpoint from bueffer
+// GetBufferedCheckpoint return checkpoint from buffer
 func GetBufferedCheckpoint(cliCtx cliContext.CLIContext) (*hmtypes.Checkpoint, error) {
 	response, err := helper.FetchFromAPI(
 		cliCtx,
@@ -419,6 +420,27 @@ func GetLatestCheckpoint(cliCtx cliContext.CLIContext) (*hmtypes.Checkpoint, err
 	var checkpoint hmtypes.Checkpoint
 	if err = jsoniter.ConfigFastest.Unmarshal(response.Result, &checkpoint); err != nil {
 		logger.Error("Error unmarshalling latest checkpoint", "url", LatestCheckpointURL, "err", err)
+		return nil, err
+	}
+
+	return &checkpoint, nil
+}
+
+// GetCheckpointByNumber returns checkpoint associated to the checkpoint number
+func GetCheckpointByNumber(cliCtx cliContext.CLIContext, number uint64) (*hmtypes.Checkpoint, error) {
+	response, err := helper.FetchFromAPI(
+		cliCtx,
+		helper.GetHeimdallServerEndpoint(fmt.Sprintf(CheckpointByNumberURL, number)),
+	)
+
+	if err != nil {
+		logger.Debug("Error fetching checkpoint", "err", err)
+		return nil, err
+	}
+
+	var checkpoint hmtypes.Checkpoint
+	if err = jsoniter.ConfigFastest.Unmarshal(response.Result, &checkpoint); err != nil {
+		logger.Error("Error unmarshalling checkpoint", "url", fmt.Sprintf(CheckpointByNumberURL, number), "err", err)
 		return nil, err
 	}
 

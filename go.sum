@@ -555,6 +555,8 @@ github.com/maticnetwork/bor v0.2.18-0.20220922050621-c91d4ca1fa4f h1:GJwlDTapZGP
 github.com/maticnetwork/bor v0.2.18-0.20220922050621-c91d4ca1fa4f/go.mod h1:tskr68Tlk2R6NLBQW2gaiQKx3BCdRvsGkcnhFUPKyh4=
 github.com/maticnetwork/cosmos-sdk v0.37.5-0.20220311095845-81690c6a53e7 h1:8NoEtDFvY0r9KTow/jgEwOfTCPnXOs6MlEdUhRUQY78=
 github.com/maticnetwork/cosmos-sdk v0.37.5-0.20220311095845-81690c6a53e7/go.mod h1:uW55Ru86N5o3L8SVkVL1TPE+mV/WRM2la8sC3TR/Ajc=
+github.com/maticnetwork/crand v1.0.2 h1:Af0tAivC8zrxXDpGWNWVT/0s1fOz8w0eRbahZgURS8I=
+github.com/maticnetwork/crand v1.0.2/go.mod h1:/NRNL3bj2eYdqpWmoIP5puxndTpi0XRxpj5ZKxfHjyg=
 github.com/maticnetwork/polyproto v0.0.2 h1:cPxuxbIDItdwGnucc3lZB58U8Zfe1mH73PWTGd15554=
 github.com/maticnetwork/polyproto v0.0.2/go.mod h1:e1mU2EXSwEpn5jM7GfNwu3AupsV6WAGoPFFfswXOF0o=
 github.com/maticnetwork/tendermint v0.26.0-dev0.0.20220923185258-3e7c7f86ce9f h1:iV69PJUEdwJJFXQvbADYVEMxDrkKAsPdHTg4U3F510I=

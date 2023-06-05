@@ -53,6 +53,7 @@ const (
 	CheckpointerPollIntervalFlag = "checkpoint_poll_interval"
 	SyncerPollIntervalFlag       = "syncer_poll_interval"
 	NoACKPollIntervalFlag        = "noack_poll_interval"
+	CheckpointAdjustIntervalFlag = "checkpoint_adjust_interval"
 	ClerkPollIntervalFlag        = "clerk_poll_interval"
 	SpanPollIntervalFlag         = "span_poll_interval"
 	MainchainGasLimitFlag        = "main_chain_gas_limit"
@@ -95,6 +96,7 @@ const (
 	DefaultCheckpointerPollInterval = 5 * time.Minute
 	DefaultSyncerPollInterval       = 1 * time.Minute
 	DefaultNoACKPollInterval        = 1010 * time.Second
+	DefaultCheckpointAdjustInterval = 30 * time.Minute
 	DefaultClerkPollInterval        = 10 * time.Second
 	DefaultSpanPollInterval         = 1 * time.Minute
 	DefaultEnableSH                 = false
@@ -162,9 +164,10 @@ type Configuration struct {
 	MainchainMaxGasPrice int64 `mapstructure:"main_chain_max_gas_price"` // max gas price to mainchain transaction. eg....submit checkpoint.
 
 	// config related to bridge
-	CheckpointerPollInterval time.Duration `mapstructure:"checkpoint_poll_interval"` // Poll interval for checkpointer service to send new checkpoints or missing ACK
-	SyncerPollInterval       time.Duration `mapstructure:"syncer_poll_interval"`     // Poll interval for syncher service to sync for changes on main chain
-	NoACKPollInterval        time.Duration `mapstructure:"noack_poll_interval"`      // Poll interval for ack service to send no-ack in case of no checkpoints
+	CheckpointerPollInterval time.Duration `mapstructure:"checkpoint_poll_interval"`        // Poll interval for checkpointer service to send new checkpoints or missing ACK
+	SyncerPollInterval       time.Duration `mapstructure:"syncer_poll_interval"`            // Poll interval for syncher service to sync for changes on main chain
+	NoACKPollInterval        time.Duration `mapstructure:"noack_poll_interval"`             // Poll interval for ack service to send no-ack in case of no checkpoints
+	CheckpointAdjustInterval time.Duration `mapstructure:"checkpoint_adjust_poll_interval"` // Poll interval for checkpoint service to send checkpoint adjust in case of checkpoint data inconsistency
 	ClerkPollInterval        time.Duration `mapstructure:"clerk_poll_interval"`
 	SpanPollInterval         time.Duration `mapstructure:"span_poll_interval"`
 	EnableSH                 bool          `mapstructure:"enable_self_heal"`         // Enable self healing
@@ -400,6 +403,7 @@ func GetDefaultHeimdallConfig() Configuration {
 		CheckpointerPollInterval: DefaultCheckpointerPollInterval,
 		SyncerPollInterval:       DefaultSyncerPollInterval,
 		NoACKPollInterval:        DefaultNoACKPollInterval,
+		CheckpointAdjustInterval: DefaultCheckpointAdjustInterval,
 		ClerkPollInterval:        DefaultClerkPollInterval,
 		SpanPollInterval:         DefaultSpanPollInterval,
 		EnableSH:                 DefaultEnableSH,
@@ -607,6 +611,16 @@ func DecorateWithHeimdallFlags(cmd *cobra.Command, v *viper.Viper, loggerInstanc
 		loggerInstance.Error(fmt.Sprintf("%v | BindPFlag | %v", caller, NoACKPollIntervalFlag), "Error", err)
 	}
 
+	// add CheckpointAdjustIntervalFlag flag
+	cmd.PersistentFlags().String(
+		CheckpointAdjustIntervalFlag,
+		"",
+		"Set no acknowledge pull interval",
+	)
+
+	if err := v.BindPFlag(CheckpointAdjustIntervalFlag, cmd.PersistentFlags().Lookup(CheckpointAdjustIntervalFlag)); err != nil {
+		loggerInstance.Error(fmt.Sprintf("%v | BindPFlag | %v", caller, CheckpointAdjustIntervalFlag), "Error", err)
+	}
 	// add ClerkPollIntervalFlag flag
 	cmd.PersistentFlags().String(
 		ClerkPollIntervalFlag,
@@ -748,6 +762,15 @@ func (c *Configuration) UpdateWithFlags(v *viper.Viper, loggerInstance logger.Lo
 		}
 	}
 
+	// get poll interval for checkpoint adjust service to send checkpoint-adjust in case of inconsistency checkpoint data from viper/cobra
+	stringConfgValue = v.GetString(CheckpointAdjustIntervalFlag)
+	if stringConfgValue != "" {
+		if c.CheckpointAdjustInterval, err = time.ParseDuration(stringConfgValue); err != nil {
+			loggerInstance.Error(logErrMsg, "Flag", CheckpointAdjustIntervalFlag, "Error", err)
+			return err
+		}
+	}
+
 	// get clerk poll interval from viper/cobra
 	stringConfgValue = v.GetString(ClerkPollIntervalFlag)
 	if stringConfgValue != "" {
@@ -840,6 +863,10 @@ func (c *Configuration) Merge(cc *Configuration) {
 
 	if cc.NoACKPollInterval != 0 {
 		c.NoACKPollInterval = cc.NoACKPollInterval
+	}
+
+	if cc.CheckpointAdjustInterval != 0 {
+		c.CheckpointAdjustInterval = cc.CheckpointAdjustInterval
 	}
 
 	if cc.ClerkPollInterval != 0 {

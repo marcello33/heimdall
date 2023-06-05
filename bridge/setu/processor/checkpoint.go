@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/maticnetwork/crand"
 	authTypes "github.com/maticnetwork/heimdall/auth/types"
 	"github.com/maticnetwork/heimdall/bridge/setu/util"
 	chainmanagerTypes "github.com/maticnetwork/heimdall/chainmanager/types"
@@ -32,10 +34,14 @@ type CheckpointProcessor struct {
 	// header listener subscription
 	cancelNoACKPolling context.CancelFunc
 
+	cancelAdjustPolling context.CancelFunc
 	// Rootchain instance
 
 	// Rootchain abi
 	rootchainAbi *abi.ABI
+
+	// Checkpoint Keeper
+	// keeper checkpoint.Keeper
 }
 
 // Result represents single req result
@@ -61,10 +67,15 @@ func (cp *CheckpointProcessor) Start() error {
 	cp.Logger.Info("Starting")
 	// no-ack
 	ackCtx, cancelNoACKPolling := context.WithCancel(context.Background())
+	// checkpoint-adjust
+	adjustCtx, cancelAdjustPolling := context.WithCancel(context.Background())
 	cp.cancelNoACKPolling = cancelNoACKPolling
+	cp.cancelAdjustPolling = cancelAdjustPolling
 	cp.Logger.Info("Start polling for no-ack", "pollInterval", helper.GetConfig().NoACKPollInterval)
+	cp.Logger.Info("Start polling for checkpoint-adjust", "pollInterval", helper.GetConfig().CheckpointAdjustInterval)
 
 	go cp.startPollingForNoAck(ackCtx, helper.GetConfig().NoACKPollInterval)
+	go cp.startPollingForCheckpointAdjust(adjustCtx, helper.GetConfig().CheckpointAdjustInterval)
 
 	return nil
 }
@@ -84,6 +95,10 @@ func (cp *CheckpointProcessor) RegisterTasks() {
 	if err := cp.queueConnector.Server.RegisterTask("sendCheckpointAckToHeimdall", cp.sendCheckpointAckToHeimdall); err != nil {
 		cp.Logger.Error("RegisterTasks | sendCheckpointAckToHeimdall", "error", err)
 	}
+
+	if err := cp.queueConnector.Server.RegisterTask("sendCheckpointAdjustToHeimdall", cp.sendCheckpointAdjustToHeimdall); err != nil {
+		cp.Logger.Error("RegisterTasks | sendCheckpointAdjustToHeimdall", "error", err)
+	}
 }
 
 func (cp *CheckpointProcessor) startPollingForNoAck(ctx context.Context, interval time.Duration) {
@@ -96,6 +111,31 @@ func (cp *CheckpointProcessor) startPollingForNoAck(ctx context.Context, interva
 			go cp.handleCheckpointNoAck()
 		case <-ctx.Done():
 			cp.Logger.Info("No-ack Polling stopped")
+			ticker.Stop()
+
+			return
+		}
+	}
+}
+
+// startPollingForCheckpointAdjust periodically checks whether we need to send MsgCheckpointAdjust
+// this randomly nominates a validator to perform the check
+func (cp *CheckpointProcessor) startPollingForCheckpointAdjust(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	rand := crand.NewRand()
+
+	for {
+		select {
+		case <-ticker.C:
+			if rand.Float64() < 0.5 {
+				if shouldSend, msgCheckpointAdjust := cp.shouldSendCheckpointAdjust(); shouldSend {
+					go cp.sendCheckpointAdjustToHeimdall(msgCheckpointAdjust)
+				}
+			}
+		case <-ctx.Done():
+			cp.Logger.Info("Checkpoint adjust polling stopped")
 			ticker.Stop()
 
 			return
@@ -309,6 +349,73 @@ func (cp *CheckpointProcessor) sendCheckpointAckToHeimdall(eventName string, che
 	}
 
 	return nil
+}
+
+// sendCheckpointAdjustToHeimdall sends MsgCheckpointAdjust
+func (cp *CheckpointProcessor) sendCheckpointAdjustToHeimdall(msgCheckpointAdjust *checkpointTypes.MsgCheckpointAdjust) error {
+	cp.Logger.Info("✅ Sending Checkpoint Adjust to Heimdall",
+		"header index", msgCheckpointAdjust.HeaderIndex,
+		"proposer", msgCheckpointAdjust.Proposer,
+		"from", msgCheckpointAdjust.From,
+		"start", msgCheckpointAdjust.StartBlock,
+		"end", msgCheckpointAdjust.EndBlock,
+		"root", msgCheckpointAdjust.RootHash,
+	)
+
+	// return broadcast to heimdall
+	if err := cp.txBroadcaster.BroadcastToHeimdall(msgCheckpointAdjust, nil); err != nil {
+		cp.Logger.Error("Error while broadcasting checkpoint to heimdall", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (cp *CheckpointProcessor) shouldSendCheckpointAdjust() (bool, *checkpointTypes.MsgCheckpointAdjust) {
+	checkpointContext, err := cp.getCheckpointContext()
+	if err != nil {
+		cp.Logger.Error("Error while fetching checkpoint context", "error", err)
+		return false, nil
+	}
+	bufferedCheckpoint, err := util.GetBufferedCheckpoint(cp.cliCtx)
+	if err != nil {
+		cp.Logger.Error("Error while fetching checkpoint from buffer", "error", err)
+		return false, nil
+	}
+	if bufferedCheckpoint != nil {
+		cp.Logger.Error("Checkpoint exists in buffer", "checkpoint", bufferedCheckpoint)
+		return false, nil
+	}
+	checkpointParams := checkpointContext.CheckpointParams
+	chainmanagerParams := checkpointContext.ChainmanagerParams
+	rootChainInstance, err := cp.contractConnector.GetRootChainInstance(chainmanagerParams.ChainParams.RootChainAddress.EthAddress())
+
+	// fetch current header block index from mainchain contract
+	currentHeaderIndex, err := cp.contractConnector.CurrentHeaderBlock(rootChainInstance, checkpointParams.ChildBlockInterval)
+	if err != nil {
+		cp.Logger.Error("Error while fetching current header block number from rootchain", "error", err)
+		return false, nil
+	}
+
+	// get header info
+	root, start, end, _, proposer, err := cp.contractConnector.GetHeaderInfo(currentHeaderIndex, rootChainInstance, checkpointParams.ChildBlockInterval)
+	if err != nil {
+		cp.Logger.Error("Error while fetching current header block object from rootchain", "error", err)
+		return false, nil
+	}
+
+	checkpointObj, err := util.GetCheckpointByNumber(cp.cliCtx, currentHeaderIndex)
+	if err != nil {
+		cp.Logger.Error("Error while fetching latest checkpoint from heimdall", "error", err)
+		return false, nil
+	}
+
+	if checkpointObj.EndBlock != end || checkpointObj.StartBlock != start || !bytes.Equal(checkpointObj.RootHash.Bytes(), root.Bytes()) || !bytes.Equal(checkpointObj.Proposer.Bytes(), proposer.Bytes()) {
+		msgCheckpointAdjust := checkpointTypes.NewMsgCheckpointAdjust(currentHeaderIndex, start, end, proposer, helper.GetFromAddress(cp.cliCtx), hmTypes.HeimdallHash(root))
+		return true, &msgCheckpointAdjust
+	}
+
+	return false, nil
 }
 
 // handleCheckpointNoAck - Checkpoint No-Ack handler
