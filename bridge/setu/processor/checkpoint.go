@@ -250,6 +250,7 @@ func (cp *CheckpointProcessor) sendCheckpointToRootchain(eventBytes string, bloc
 // sendCheckpointAckToHeimdall - handles checkpointAck event from rootchain
 // 1. create and broadcast checkpointAck msg to heimdall.
 func (cp *CheckpointProcessor) sendCheckpointAckToHeimdall(eventName string, checkpointAckStr string) error {
+
 	// fetch checkpoint context
 	checkpointContext, err := cp.getCheckpointContext()
 	if err != nil {
@@ -301,6 +302,7 @@ func (cp *CheckpointProcessor) sendCheckpointAckToHeimdall(eventName string, che
 			uint64(log.Index),
 		)
 
+		time.Sleep(20 * time.Minute)
 		// return broadcast to heimdall
 		if err = cp.txBroadcaster.BroadcastToHeimdall(msg, event); err != nil {
 			cp.Logger.Error("Error while broadcasting checkpoint-ack to heimdall", "error", err)
