@@ -579,9 +579,11 @@ func (app *HeimdallApp) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) ab
 
 	// --- Start update to new validators
 	currentValidatorSet := app.StakingKeeper.GetValidatorSet(ctx)
+	logger.Info("VALIDATOR SET!!: ", len(currentValidatorSet.Validators))
 	allValidators := app.StakingKeeper.GetAllValidators(ctx)
+	logger.Info("VALIDATOR SET!!: ", len(allValidators))
 	ackCount := app.CheckpointKeeper.GetACKCount(ctx)
-
+	logger.Info("ACK COUNT!!: ", ackCount)
 	// get validator updates
 	setUpdates := helper.GetUpdatedValidators(
 		&currentValidatorSet, // pointer to current validator set -- UpdateValidators will modify it
