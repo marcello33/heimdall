@@ -235,6 +235,7 @@ func processSig(
 
 		copy(pk[:], p[:])
 
+		helper.Logger.Info("ADDRESS", "account", pk.Address())
 		if !bytes.Equal(acc.GetAddress().Bytes(), pk.Address().Bytes()) {
 			return nil, sdk.ErrUnauthorized("signature verification failed; verify correct account sequence and chain-id").Result()
 		}
