@@ -380,11 +380,11 @@ func PostHandleMsgCheckpointAck(ctx sdk.Context, k Keeper, msg types.MsgCheckpoi
 	}
 
 	// get last checkpoint from buffer
-	bufferCheckpoint, err := k.GetCheckpointFromBuffer(ctx)
-	if err != nil {
-		logger.Error("Unable to get checkpoint buffer", "error", err)
-		return common.ErrBadAck(k.Codespace()).Result()
-	}
+	// bufferCheckpoint, err := k.GetCheckpointFromBuffer(ctx)
+	// if err != nil {
+	// 	logger.Error("Unable to get checkpoint buffer", "error", err)
+	// 	return common.ErrBadAck(k.Codespace()).Result()
+	// }
 
 	lastCheckpoint, err := k.GetLastCheckpoint(ctx)
 	if err != nil && msg.StartBlock != 0 {
@@ -432,7 +432,7 @@ func PostHandleMsgCheckpointAck(ctx sdk.Context, k Keeper, msg types.MsgCheckpoi
 		EndBlock:   msg.EndBlock,
 		RootHash:   msg.RootHash,
 		BorChainID: lastCheckpoint.BorChainID,
-		TimeStamp:  bufferCheckpoint.TimeStamp,
+		TimeStamp:  uint64(ctx.BlockTime().Unix()),
 	}
 	if err = k.AddCheckpoint(ctx, msg.Number, *checkpointObj); err != nil {
 		logger.Error("Error while adding checkpoint into store", "checkpointNumber", msg.Number)
