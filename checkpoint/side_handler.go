@@ -380,45 +380,60 @@ func PostHandleMsgCheckpointAck(ctx sdk.Context, k Keeper, msg types.MsgCheckpoi
 	}
 
 	// get last checkpoint from buffer
-	checkpointObj, err := k.GetCheckpointFromBuffer(ctx)
+	bufferCheckpoint, err := k.GetCheckpointFromBuffer(ctx)
 	if err != nil {
 		logger.Error("Unable to get checkpoint buffer", "error", err)
 		return common.ErrBadAck(k.Codespace()).Result()
 	}
 
+	lastCheckpoint, err := k.GetLastCheckpoint(ctx)
+	if err != nil && msg.StartBlock != 0 {
+		logger.Error("Error occured while fetching last checkpoint from DB", "error", err)
+		return common.ErrBadAck(k.Codespace()).Result()
+	}
+
 	// invalid start block
-	if msg.StartBlock != checkpointObj.StartBlock {
-		logger.Error("Invalid start block", "startExpected", checkpointObj.StartBlock, "startReceived", msg.StartBlock)
+	if msg.StartBlock != 0 && msg.StartBlock != lastCheckpoint.EndBlock+1 {
+		logger.Error("Invalid start block", "startExpected", lastCheckpoint.EndBlock+1, "startReceived", msg.StartBlock)
 		return common.ErrBadAck(k.Codespace()).Result()
 	}
 
 	// Return err if start and end matches but contract root hash doesn't match
-	if msg.StartBlock == checkpointObj.StartBlock && msg.EndBlock == checkpointObj.EndBlock && !msg.RootHash.Equals(checkpointObj.RootHash) {
-		logger.Error("Invalid ACK",
-			"startExpected", checkpointObj.StartBlock,
-			"startReceived", msg.StartBlock,
-			"endExpected", checkpointObj.EndBlock,
-			"endReceived", msg.StartBlock,
-			"rootExpected", checkpointObj.RootHash.String(),
-			"rootRecieved", msg.RootHash.String(),
-		)
+	// if msg.StartBlock == checkpointObj.StartBlock && msg.EndBlock == checkpointObj.EndBlock && !msg.RootHash.Equals(checkpointObj.RootHash) {
+	// 	logger.Error("Invalid ACK",
+	// 		"startExpected", checkpointObj.StartBlock,
+	// 		"startReceived", msg.StartBlock,
+	// 		"endExpected", checkpointObj.EndBlock,
+	// 		"endReceived", msg.StartBlock,
+	// 		"rootExpected", checkpointObj.RootHash.String(),
+	// 		"rootRecieved", msg.RootHash.String(),
+	// 	)
 
-		return common.ErrBadAck(k.Codespace()).Result()
-	}
+	// 	return common.ErrBadAck(k.Codespace()).Result()
+	// }
 
 	// adjust checkpoint data if latest checkpoint is already submitted
-	if checkpointObj.EndBlock > msg.EndBlock {
-		logger.Info("Adjusting endBlock to one already submitted on chain", "endBlock", checkpointObj.EndBlock, "adjustedEndBlock", msg.EndBlock)
-		checkpointObj.EndBlock = msg.EndBlock
-		checkpointObj.RootHash = msg.RootHash
-		checkpointObj.Proposer = msg.Proposer
-	}
+	// if checkpointObj.EndBlock > msg.EndBlock {
+	// 	logger.Info("Adjusting endBlock to one already submitted on chain", "endBlock", checkpointObj.EndBlock, "adjustedEndBlock", msg.EndBlock)
+	// 	checkpointObj.EndBlock = msg.EndBlock
+	// 	checkpointObj.RootHash = msg.RootHash
+	// 	checkpointObj.Proposer = msg.Proposer
+	// }
 
 	//
 	// Update checkpoint state
 	//
 
 	// Add checkpoint to store
+
+	checkpointObj := &hmTypes.Checkpoint{
+		Proposer:   msg.Proposer,
+		StartBlock: msg.StartBlock,
+		EndBlock:   msg.EndBlock,
+		RootHash:   msg.RootHash,
+		BorChainID: lastCheckpoint.BorChainID,
+		TimeStamp:  bufferCheckpoint.TimeStamp,
+	}
 	if err = k.AddCheckpoint(ctx, msg.Number, *checkpointObj); err != nil {
 		logger.Error("Error while adding checkpoint into store", "checkpointNumber", msg.Number)
 		return sdk.ErrInternal("Failed to add checkpoint into store").Result()

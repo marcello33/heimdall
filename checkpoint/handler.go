@@ -197,30 +197,36 @@ func handleMsgCheckpointAck(ctx sdk.Context, msg types.MsgCheckpointAck, k Keepe
 	logger := k.Logger(ctx)
 
 	// Get last checkpoint from buffer
-	headerBlock, err := k.GetCheckpointFromBuffer(ctx)
-	if err != nil {
-		logger.Error("Unable to get checkpoint", "error", err)
+	// headerBlock, err := k.GetCheckpointFromBuffer(ctx)
+	// if err != nil {
+	// 	logger.Error("Unable to get checkpoint", "error", err)
+	// 	return common.ErrBadAck(k.Codespace()).Result()
+	// }
+
+	lastCheckpoint, err := k.GetLastCheckpoint(ctx)
+	if err != nil && msg.StartBlock != 0 {
+		logger.Error("Error occured while fetching last checkpoint from DB", "error", err)
 		return common.ErrBadAck(k.Codespace()).Result()
 	}
 
-	if msg.StartBlock != headerBlock.StartBlock {
-		logger.Error("Invalid start block", "startExpected", headerBlock.StartBlock, "startReceived", msg.StartBlock)
+	if msg.StartBlock != 0 && msg.StartBlock != lastCheckpoint.EndBlock+1 {
+		logger.Error("Invalid start block", "startExpected", lastCheckpoint.EndBlock+1, "startReceived", msg.StartBlock)
 		return common.ErrBadAck(k.Codespace()).Result()
 	}
 
 	// Return err if start and end matches but contract root hash doesn't match
-	if msg.StartBlock == headerBlock.StartBlock && msg.EndBlock == headerBlock.EndBlock && !msg.RootHash.Equals(headerBlock.RootHash) {
-		logger.Error("Invalid ACK",
-			"startExpected", headerBlock.StartBlock,
-			"startReceived", msg.StartBlock,
-			"endExpected", headerBlock.EndBlock,
-			"endReceived", msg.StartBlock,
-			"rootExpected", headerBlock.RootHash.String(),
-			"rootRecieved", msg.RootHash.String(),
-		)
+	// if msg.StartBlock == headerBlock.StartBlock && msg.EndBlock == headerBlock.EndBlock && !msg.RootHash.Equals(headerBlock.RootHash) {
+	// 	logger.Error("Invalid ACK",
+	// 		"startExpected", headerBlock.StartBlock,
+	// 		"startReceived", msg.StartBlock,
+	// 		"endExpected", headerBlock.EndBlock,
+	// 		"endReceived", msg.StartBlock,
+	// 		"rootExpected", headerBlock.RootHash.String(),
+	// 		"rootRecieved", msg.RootHash.String(),
+	// 	)
 
-		return common.ErrBadAck(k.Codespace()).Result()
-	}
+	// 	return common.ErrBadAck(k.Codespace()).Result()
+	// }
 
 	ctx.EventManager().EmitEvents(sdk.Events{
 		sdk.NewEvent(
