@@ -85,6 +85,7 @@ func NewAnteHandler(
 
 		helper.Logger.Info("TX RECEIVED!", "tx", tx)
 		helper.Logger.Info("STD TX!", "tx", stdTx)
+		helper.Logger.Info("MSG!", "msg", stdTx.Msg)
 
 		// get account params
 		params := ak.GetParams(ctx)
@@ -324,5 +325,7 @@ func GetSignBytes(chainID string, stdTx authTypes.StdTx, acc authTypes.Account, 
 		accNum = acc.GetAccountNumber()
 	}
 
+	sigBytes := authTypes.StdSignBytes(chainID, accNum, acc.GetSequence(), stdTx.Msg, stdTx.Memo)
+	helper.Logger.Info("SIGN BYTES!", "sigbytes", sigBytes)
 	return authTypes.StdSignBytes(chainID, accNum, acc.GetSequence(), stdTx.Msg, stdTx.Memo)
 }
