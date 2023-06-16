@@ -83,6 +83,9 @@ func NewAnteHandler(
 			return newCtx, sdk.ErrInternal("tx must be StdTx").Result(), true
 		}
 
+		helper.Logger.Info("TX RECEIVED!", "tx", tx)
+		helper.Logger.Info("STD TX!", "tx", stdTx)
+
 		// get account params
 		params := ak.GetParams(ctx)
 
