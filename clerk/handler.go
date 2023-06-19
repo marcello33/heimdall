@@ -75,6 +75,8 @@ func handleMsgEventRecord(ctx sdk.Context, msg types.MsgEventRecord, k Keeper, c
 		),
 	})
 
+	k.Logger(ctx).Info("✅ SUCESS!")
+
 	return sdk.Result{
 		Events: ctx.EventManager().Events(),
 	}
