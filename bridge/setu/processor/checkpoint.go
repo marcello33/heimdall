@@ -251,6 +251,9 @@ func (cp *CheckpointProcessor) sendCheckpointToRootchain(eventBytes string, bloc
 // 1. create and broadcast checkpointAck msg to heimdall.
 func (cp *CheckpointProcessor) sendCheckpointAckToHeimdall(eventName string, checkpointAckStr string) error {
 	// fetch checkpoint context
+
+	return nil
+
 	checkpointContext, err := cp.getCheckpointContext()
 	if err != nil {
 		return err
